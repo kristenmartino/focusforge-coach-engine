@@ -1,6 +1,6 @@
 # FocusForgeCoachEngine
 
-> A deliberately-not-an-LLM coaching engine for focus-session apps.
+> A hand-written focus coach.
 > The behavior layer that powers the AI Coach in
 > [FocusForge](https://github.com/kristenmartino/focusforge).
 
@@ -10,40 +10,60 @@
 
 ## What this is
 
-A small Swift package that turns the user's current behavior (completion rate,
-abandon rate, streak risk, session length) into one of three coaching
-moments — **intent framing** before a session, **reflection** after, and a
-**streak rescue nudge** when the streak is at risk.
+A small Swift package that turns the user's current behavior (completion
+rate, abandon rate, streak risk, session length) into one of three
+coaching moments — **intent framing** before a session, **reflection**
+after, and a **streak rescue nudge** when the streak is at risk.
 
-It does this **without an LLM**. There is no cloud call, no model
-inference, no behavioral data leaving the device. The "AI" is a
-hand-authored catalog of ~33 templates plus a router that picks the right
-one given the user's signal and preferred tone.
+The whole engine fits in ~250 lines of routing logic and a catalog of
+**33 hand-written templates** — 15 framings, 10 reflections, 8 nudges,
+each authored in three tones (encouraging, direct, calm). That's roughly
+**99 distinct pieces of micro-copy**, all written by one person, none
+generated.
 
-## Why no LLM?
+You can read the entire decision surface of the coach in a single file:
+[`CoachTemplateCatalog.swift`](Sources/FocusForgeCoachEngine/Catalog/CoachTemplateCatalog.swift).
 
-Three reasons, in order of how much they matter to me:
+That's the point.
 
-1. **Privacy as a structural claim.** "Your focus data never leaves your
-   phone" is only credible if there's nothing on the other side of a
-   network call to send it to. A locally-bundled template catalog makes
-   that claim provable — you can read the entire decision surface in
-   [`CoachTemplateCatalog.swift`](Sources/FocusForgeCoachEngine/Catalog/CoachTemplateCatalog.swift).
+## Why hand-written
 
-2. **Latency and reliability.** Coach messages render in a few
-   milliseconds, even with the device offline. There is no spinner, no
-   "AI is thinking…" state, no rate limit, no cost-per-user that scales
-   with engagement.
+Most "AI coaching" today is a wrapper around a frontier model, and the
+output reads like it. `"You're doing great! Keep up the awesome work! 🌟
+Remember, every step counts on your journey to success! 💪"` — the
+voice of nobody, for nobody, polished to a sheen that has no taste.
 
-3. **The job is small.** Routing a user from "high abandon rate + writing
-   task" to "Just get words down. Aim for one paragraph to start" is
-   pattern-matching, not generation. Spending a billion-parameter model
-   on it is using a load-bearing wall for a coat hook.
+FocusForge's coach is the opposite bet:
 
-This is not a take against LLMs in general — it's a take against using
-them as a default. If you're tempted to reach for an LLM, you should
-first ask: would a lookup table work? Often the answer is yes, and the
-lookup table is more inspectable, faster, and safer.
+- **Every line is writing, not output.** A writer chose each word.
+  Tone variants exist because a person's preference for "Take a breath
+  and begin" over "Start strong." is a real preference, not a parameter
+  to tune. The encouraging variant exclaims. The direct variant
+  commands. The calm variant invites. You can tell which is which
+  without being told.
+
+- **Variety comes from authoring, not sampling.** The catalog
+  deduplicates against recent history so the user doesn't see the same
+  template twice in a row, but the variety is bounded by the writer.
+  No template ever gets accidentally aggressive or syrupy because
+  someone tweaked the temperature.
+
+- **The safety floor is read, not promised.** Below the catalog, a
+  10-line filter rejects shaming patterns — "you failed," "lazy,"
+  "pathetic," etc. — and caps output at 300 characters. You can read
+  the list in [`SafetyFilter.swift`](Sources/FocusForgeCoachEngine/Engine/SafetyFilter.swift).
+  It's auditable. It's not "the model has been aligned."
+
+The trade is real: the coach can't say genuinely new things. It can't
+adapt to a user typing "help me focus on debugging segfaults in this
+specific kernel module." It picks one of 99 written pieces, fills in
+the task name, and ships.
+
+For a focus app, that trade is the *right way around*. A focus app
+shouldn't be talking to the user during their focus block. It should
+show up briefly with one well-chosen sentence and then get out of the
+way. Picking from a tight catalog of human-written lines does that
+better than a model that has to be wrangled into brevity.
 
 ## What it does
 
@@ -70,7 +90,6 @@ print(framing.reframedTask)
 // → "Just get words down for Draft Q3 marketing report. Aim for one paragraph to start."
 print(framing.motivationalLine)
 // → "A rough draft is better than a blank page!"
-history.recordShown(templateID: framing.templateID, featureType: .framing)
 
 // After it ends:
 let reflection = CoachTemplateEngine.selectReflectionTemplate(
@@ -92,9 +111,37 @@ let nudge = CoachTemplateEngine.selectNudgeTemplate(
 )
 print(nudge.title, nudge.body)
 // → "Your streak matters" "Your 5-day streak is waiting for you. A brief session is all it takes."
-print(nudge.quickStartSuggestion)
-// → "Try a 15-minute session"
 ```
+
+## The craft, end-to-end
+
+This package is one piece of a larger handmade thing. In FocusForge:
+
+- The **timer ring** is three composed layers — subtle track, wide glow
+  aura at 15% opacity, thin crisp ring at 90% — not a default
+  `Circle().trim()`.
+- The **reward moment** is a 5-beat cinematic animation. Ring pulse →
+  background crossfade to deep purple → checkmark + headline →
+  reward card with count-up XP → CTA fade-in. Each beat hand-tuned.
+- The app has **two emotional registers**. Focus mode: near-black,
+  one accent color, the character absent. Reward mode: deep purple
+  atmosphere, layered radial glows, particles, dramatic character
+  lighting. The contrast between restraint and richness IS the
+  dopamine hit.
+- Every color is a named token in `FFTheme`. No raw `Color.blue`. No
+  guess-the-hex. Contrast pairs measured against WCAG AA.
+- The character grows with the user — a dressing room of cosmetics
+  unlocked at streak milestones, rendered with real lighting and a
+  ground plane that catches a subtle underglow.
+
+The coach engine is the writing layer of the same project. It sits
+underneath three SwiftUI views in FocusForge — `IntentFramingView`,
+`PostReflectionCardView`, `StreakRescueBannerView` — each composed
+with the same atmospheric design system. The coach's words land on
+surfaces that were drawn, not stamped out.
+
+If you want to see what this looks like in motion, the app is
+[here](https://github.com/kristenmartino/focusforge).
 
 ## How selection works
 
@@ -111,19 +158,17 @@ For framing, the engine:
    shown recently (default: last 3).
 4. Picks one at random, falling back to same-category-any-condition,
    then to general+default, then to the first template in the catalog.
-5. Interpolates the user's task name, runs the output through a
-   safety filter (catches shaming language, caps length at 300 chars),
-   and returns a `FramingResult`.
+5. Interpolates the user's task name, runs the output through the
+   safety filter, and returns a `FramingResult`.
 
-Reflection follows the same pattern; nudges route on streak length
+Reflection follows the same shape; nudges route on streak length
 (`1...3`, `4...7`, `8...14`, `15...999`) and don't consult history
-(they're cooldown-throttled by the host app).
+(they're cooldown-throttled by the host app via `NudgeFrequency`).
 
-For a complete trace, read the
-[implementation](Sources/FocusForgeCoachEngine/Engine/CoachTemplateEngine.swift) —
-the whole engine is one ~250-line file.
+The whole engine is one ~250-line file. Worth reading:
+[`CoachTemplateEngine.swift`](Sources/FocusForgeCoachEngine/Engine/CoachTemplateEngine.swift).
 
-## Architecture choices worth calling out
+## Architecture choices
 
 **No SwiftData, no Core Data, no persistence at all.** The package
 defines a `TemplateUsageHistory` protocol for "what did the user see
@@ -132,49 +177,65 @@ recently" so consumers can plug in whatever storage they use. An
 tests.
 
 **No `ModelContext`, no `@MainActor`, nothing platform-bound.** Pure
-Swift. Works on iOS, macOS, watchOS, tvOS. The package depends only on
-`Foundation`.
+Swift. Works on iOS, macOS, watchOS, tvOS. Foundation only.
 
-**Deterministic test variants.** Every selection method has a `using:
-inout RNG` overload that takes an explicit random number generator. Tests
-seed an LCG and assert exact template IDs come back. Production callers
-use the default overload, which seeds from `SystemRandomNumberGenerator`.
+**Deterministic test variants.** Every selection method has an
+`using: inout RNG` overload that takes an explicit random number
+generator. Tests seed an LCG and assert exact template IDs come back.
 
 **`Sendable` end to end.** All public types — including the engine
-itself — are concurrency-safe. The engine is an `enum` of static methods,
-so there's nothing to share.
+itself — are concurrency-safe.
 
-**Safety filter as defense in depth.** The bundled catalog is
-hand-reviewed and is not the threat model — the filter exists to protect
-downstream consumers who extend the catalog. It catches shaming phrases
-("you failed", "lazy", "pathetic", etc.) and enforces a 300-character
-cap on rendered output.
+**Nothing leaves the device.** The engine doesn't know what a
+network is. The host app's behavior data — task names, completion
+rates, streak history — is read locally and consumed locally. The
+privacy claim isn't a policy; it's a property of the architecture.
 
 ## Customizing the catalog
 
 Three options, in order of increasing commitment:
 
-**1. Use the bundled catalog as-is.** It's tuned for a Pomodoro app but
-the conditions are general enough to work for any session-based focus
-tool.
+**1. Use the bundled catalog as-is.** It's tuned for a Pomodoro app
+but the conditions are general enough to work for any session-based
+focus tool.
 
 **2. Pass your own array of templates.** Every selector takes a
-`catalog:` parameter that defaults to the bundled catalog. Drop in your
-own:
+`catalog:` parameter that defaults to the bundled catalog. Drop in
+your own:
 
 ```swift
-let custom: [FramingTemplate] = […]
+let myFramings: [FramingTemplate] = [
+    FramingTemplate(
+        id: "frm_custom_01",
+        category: "general",
+        condition: .default,
+        reframeFormat: [
+            .encouraging: "Today's focus: %@. What's the one thing?",
+            .direct: "%@. Pick one outcome.",
+            .calm: "Settle into %@. One small piece.",
+        ],
+        motivationalLine: [
+            .encouraging: "You've got this.",
+            .direct: "Go.",
+            .calm: "Breathe.",
+        ]
+    ),
+    // ...
+]
+
 let framing = CoachTemplateEngine.selectFramingTemplate(
     taskName: task,
     signal: signal,
     tone: tone,
     history: history,
-    catalog: custom
+    catalog: myFramings
 )
 ```
 
 **3. Fork the package.** The catalog file is plain Swift; adding
-templates, categories, or conditions is mechanical.
+templates, categories, or conditions is mechanical. If you write
+copy you're proud of, send a PR — the bundled catalog is opinionated
+but not territorial.
 
 ## Installation
 
