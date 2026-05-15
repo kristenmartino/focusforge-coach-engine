@@ -198,7 +198,13 @@ final class CoachTemplateEngineTests: XCTestCase {
             history: InMemoryTemplateHistory(),
             using: &rng2
         )
-        XCTAssertEqual(r1, r2)
+        // Compare content fields, not the per-instance id (UUID is unique
+        // per call by design — it's what makes the result usable as
+        // `.sheet(item:)` parameter).
+        XCTAssertEqual(r1.templateID, r2.templateID)
+        XCTAssertEqual(r1.originalTask, r2.originalTask)
+        XCTAssertEqual(r1.reframedTask, r2.reframedTask)
+        XCTAssertEqual(r1.motivationalLine, r2.motivationalLine)
     }
 
     // MARK: - Reflection selection
