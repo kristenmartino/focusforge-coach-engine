@@ -7,11 +7,9 @@ import Foundation
 /// - ``reflectionTemplates`` — shown after a session completes.
 /// - ``nudgeTemplates`` — shown when a streak is at risk.
 ///
-/// Every string of user-facing copy in the entire coach lives in this file.
-/// No model weights, no remote fetches, no inference — just hand-authored
-/// templates routed by simple condition matching. That property is what makes
-/// the coach inspectable and the privacy claim ("your work data never leaves
-/// your phone") provable.
+/// Contains the bundled prompt templates. The engine selects and formats
+/// them locally using keyword and behavior rules, without model inference
+/// or network calls. Host-app analytics and storage are outside this package.
 ///
 /// To customize the coach without forking, copy `framingTemplates`,
 /// `reflectionTemplates`, or `nudgeTemplates` into your own array and pass it
