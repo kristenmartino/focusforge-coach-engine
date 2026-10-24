@@ -2,10 +2,9 @@ import Foundation
 
 /// Filters template output for shaming language and length.
 ///
-/// The coach catalog is hand-written and reviewed, so the safety filter is
-/// primarily a defense in depth — useful when downstream consumers extend
-/// the catalog with their own templates and might accidentally introduce
-/// hostile copy.
+/// Applies a substring blocklist and length cap to bundled or custom templates.
+/// This catches the listed patterns; it is not a comprehensive content-safety
+/// check.
 ///
 /// **Banned patterns** (case-insensitive substring match): "you failed",
 /// "you should be ashamed", "disappointed in you", "lazy", "pathetic",
